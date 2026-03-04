@@ -556,7 +556,6 @@ body {
     <div class="login-logo">
       <div class="logo-icon">🏥</div>
       <h1>VOS Survey</h1>
-      <h1>งานแผนและพัสดุ โทร 7043</h1>
       <p>แบบสำรวจเสียงผู้มีส่วนได้ส่วนเสีย<br>โรงพยาบาลมหาวิทยาลัยพะเยา</p>
     </div>
 
@@ -599,23 +598,30 @@ body {
       <button class="back-link" onclick="backToRole()">← กลับ</button>
       <div style="color:rgba(255,255,255,0.85);font-size:14px;margin-bottom:20px;">
         <strong style="color:white;">🔐 เข้าสู่ระบบผู้ดูแล</strong><br>
-        กรุณาใส่รหัสผ่านผู้ดูแลระบบ
+        รหัสผ่านถูกตรวจสอบจากเซิร์ฟเวอร์ Google Apps Script
       </div>
       <div class="login-input-wrap">
         <span class="login-input-icon">👤</span>
-        <input class="login-input" type="text" id="admin-username" placeholder="ชื่อผู้ดูแล" value="admin">
+        <input class="login-input" type="text" id="admin-username" placeholder="ชื่อผู้ดูแล" value="Admin">
       </div>
       <div class="login-input-wrap">
         <span class="login-input-icon">🔒</span>
         <input class="login-input" type="password" id="admin-password" placeholder="รหัสผ่าน" onkeydown="if(event.key==='Enter')loginAsAdmin()">
         <button class="toggle-pw" onclick="togglePw()" type="button" id="pw-eye">👁️</button>
       </div>
+      <div class="login-input-wrap" id="script-url-wrap">
+        <span class="login-input-icon" style="font-size:14px;">🔗</span>
+        <input class="login-input" type="url" id="admin-script-url" placeholder="Apps Script URL (https://script.google.com/...)" style="font-size:12px;" onkeydown="if(event.key==='Enter')loginAsAdmin()">
+      </div>
+      <div style="color:rgba(255,255,255,0.4);font-size:11px;margin-bottom:12px;padding:0 4px;">
+        🛡️ รหัสผ่านถูกเก็บบนเซิร์ฟเวอร์ — ไม่สามารถดูได้จาก F12
+      </div>
       <div id="admin-err" class="login-err">รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่</div>
-      <button class="btn-login" onclick="loginAsAdmin()">🔐 เข้าสู่ระบบ</button>
+      <button class="btn-login" id="btn-admin-login" onclick="loginAsAdmin()">🔐 เข้าสู่ระบบ</button>
     </div>
 
     <div class="login-footer">
-      VOS Survey v1.0 | HA / EdPEx / TQA / WFME | งานแผน รพ.มพ. ครั้งที่ 1 พ.ศ. 2569
+      VOS Survey v2.0 | HA / EdPEx / TQA / WFME | พศช. ครั้งที่ 10 พ.ศ. 2569
     </div>
   </div>
 </div>
@@ -742,63 +748,100 @@ body {
         <p>ทำตามขั้นตอนเหล่านี้เพื่อเก็บข้อมูลแบบสอบถามใน Google Sheets โดยอัตโนมัติ</p>
         <ol class="step-list">
           <li>สร้าง Google Spreadsheet ใหม่ใน Google Drive ของคุณ</li>
-          <li>เปิด <strong>Extensions → Apps Script</strong> แล้ววางโค้ดด้านล่าง</li>
+          <li>เปิด <strong>Extensions → Apps Script</strong> แล้ววางโค้ดด้านล่างทั้งหมด</li>
+          <li>ที่ dropdown ด้านบน เลือก <strong>setInitialPassword</strong> แล้วกด ▶️ Run เพื่อตั้งรหัสเริ่มต้น</li>
           <li>คลิก <strong>Deploy → New deployment → Web app</strong></li>
-          <li>ตั้งค่า Execute as: "Me" | Who has access: "Anyone"</li>
-          <li>คัดลอก Web app URL นำมาวางในช่องด้านบน</li>
+          <li>ตั้งค่า Execute as: <strong>"Me"</strong> | Who has access: <strong>"Anyone"</strong></li>
+          <li>คัดลอก Web app URL นำมาวางในช่องด้านบน แล้วกด 💾 บันทึก</li>
+          <li>Login ด้วยรหัส <strong>admin1234</strong> แล้ว <strong>เปลี่ยนรหัสผ่านทันที</strong> ที่หน้าตั้งค่า</li>
         </ol>
-        <div class="code-block" id="apps-script-code">function doPost(e) {
+        <div class="code-block" id="apps-script-code">// ═══════════════════════════════════════════
+// VOS Survey — Google Apps Script
+// วางโค้ดทั้งหมดนี้ใน Apps Script แล้ว Deploy
+// ═══════════════════════════════════════════
+
+function doPost(e) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName('VOS_Responses') || ss.insertSheet('VOS_Responses');
-    var data = JSON.parse(e.postData.contents);
-    
-    // Add header if empty
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['Timestamp','Hospital','Period','Collector','GroupID','GroupName',
-        'GroupType','ProfileJSON','LikertJSON','OpenEndedJSON','AvgScore']);
+    var body = JSON.parse(e.postData.contents);
+    var action = body.action || 'submitForm';
+
+    // ── ตรวจสอบรหัสผ่าน Admin ──────────────
+    if (action === 'verifyAdmin') {
+      var stored = PropertiesService.getScriptProperties()
+                    .getProperty('ADMIN_PASSWORD') || 'admin1234';
+      return json({ ok: body.password === stored });
     }
-    
-    var row = [
-      new Date().toISOString(),
-      data.hospital || '', data.period || '', data.collector || '',
-      data.groupId || '', data.groupName || '', data.groupType || '',
-      JSON.stringify(data.profile || {}),
-      JSON.stringify(data.likert || {}),
-      JSON.stringify(data.openEnded || {}),
-      data.avgScore || 0
-    ];
-    sheet.appendRow(row);
-    
-    return ContentService.createTextOutput(JSON.stringify({success:true}))
-      .setMimeType(ContentService.MimeType.JSON);
+
+    // ── เปลี่ยนรหัสผ่าน Admin ───────────────
+    if (action === 'changePassword') {
+      var stored = PropertiesService.getScriptProperties()
+                    .getProperty('ADMIN_PASSWORD') || 'admin1234';
+      if (body.current !== stored) {
+        return json({ ok: false, msg: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
+      }
+      PropertiesService.getScriptProperties()
+        .setProperty('ADMIN_PASSWORD', body.newPw);
+      return json({ ok: true });
+    }
+
+    // ── บันทึกแบบสอบถาม ──────────────────────
+    if (action === 'submitForm') {
+      var ss    = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName('VOS_Responses')
+                  || ss.insertSheet('VOS_Responses');
+      if (sheet.getLastRow() === 0) {
+        sheet.appendRow(['Timestamp','Hospital','Period','Collector',
+          'GroupID','GroupName','GroupType',
+          'ProfileJSON','LikertJSON','OpenEndedJSON','AvgScore']);
+      }
+      sheet.appendRow([
+        new Date().toISOString(),
+        body.hospital||'', body.period||'', body.collector||'',
+        body.groupId||'', body.groupName||'', body.groupType||'',
+        JSON.stringify(body.profile||{}),
+        JSON.stringify(body.likert||{}),
+        JSON.stringify(body.openEnded||{}),
+        body.avgScore||0
+      ]);
+      return json({ ok: true });
+    }
+
+    return json({ ok: false, msg: 'Unknown action' });
+
   } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({success:false, error:err.message}))
-      .setMimeType(ContentService.MimeType.JSON);
+    return json({ ok: false, error: err.message });
   }
 }
 
 function doGet(e) {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('VOS_Responses');
-    if (!sheet || sheet.getLastRow() <= 1) {
-      return ContentService.createTextOutput(JSON.stringify([]))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-    var data = sheet.getDataRange().getValues();
+    if (!sheet || sheet.getLastRow() <= 1) return json([]);
+    var data    = sheet.getDataRange().getValues();
     var headers = data[0];
-    var rows = data.slice(1).map(function(row) {
+    var rows    = data.slice(1).map(function(row) {
       var obj = {};
       headers.forEach(function(h,i){ obj[h] = row[i]; });
       return obj;
     });
-    return ContentService.createTextOutput(JSON.stringify(rows))
-      .setMimeType(ContentService.MimeType.JSON);
+    return json(rows);
   } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({error:err.message}))
-      .setMimeType(ContentService.MimeType.JSON);
+    return json({ error: err.message });
   }
+}
+
+function json(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ── ตั้งรหัสผ่านเริ่มต้นครั้งแรก (รันครั้งเดียว) ──
+function setInitialPassword() {
+  PropertiesService.getScriptProperties()
+    .setProperty('ADMIN_PASSWORD', 'admin1234');
+  Logger.log('✅ ตั้งรหัสผ่านเริ่มต้นแล้ว: admin1234');
 }</div>
         <button class="btn btn-sm btn-outline" onclick="copyScript()" style="margin-top:10px;">📋 คัดลอกโค้ด</button>
       </div>
@@ -913,14 +956,31 @@ function doGet(e) {
 
 <script>
 // ═══════════════════════════════════════════
-// AUTH & ROLE MANAGEMENT
+// AUTH & ROLE MANAGEMENT (Server-side)
 // ═══════════════════════════════════════════
 const AUTH = {
   currentRole: null,
   currentUser: '',
-  getAdminPassword() { return localStorage.getItem('vos_admin_pw') || 'Palnuph'; },
-  setAdminPassword(pw) { localStorage.setItem('vos_admin_pw', pw); }
+  scriptUrl: '',
+  // รหัสผ่านไม่เก็บใน browser — ตรวจสอบจากเซิร์ฟเวอร์เท่านั้น
+  getScriptUrl() {
+    return localStorage.getItem('vos_script_url') || '';
+  },
+  saveScriptUrl(url) {
+    localStorage.setItem('vos_script_url', url);
+  }
 };
+
+// โหลด Script URL ที่บันทึกไว้
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = AUTH.getScriptUrl();
+  if (saved) {
+    document.getElementById('admin-script-url').value = saved;
+    // sync กับ setup page ด้วย
+    const cfgUrl = document.getElementById('cfg-script-url');
+    if (cfgUrl) cfgUrl.value = saved;
+  }
+});
 
 function selectRole(role) {
   document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
@@ -945,25 +1005,67 @@ function loginAsUser() {
   document.getElementById('user-mode-sub').textContent = 'สวัสดี ' + name + ' — กรุณาเลือกกลุ่มที่ตรงกับบทบาทของท่าน';
   renderUserGroupSelector();
 }
-function loginAsAdmin() {
-  const pw = document.getElementById('admin-password').value;
-  const name = document.getElementById('admin-username').value.trim() || 'Admin';
-  if (pw !== AUTH.getAdminPassword()) {
-    document.getElementById('admin-err').classList.add('show');
-    document.getElementById('admin-password').style.borderColor = 'rgba(231,111,81,0.6)';
-    setTimeout(() => { document.getElementById('admin-password').style.borderColor = ''; }, 1500);
-    return;
+
+async function loginAsAdmin() {
+  const pw      = document.getElementById('admin-password').value;
+  const name    = document.getElementById('admin-username').value.trim() || 'Admin';
+  const url     = document.getElementById('admin-script-url').value.trim();
+  const errDiv  = document.getElementById('admin-err');
+  const btn     = document.getElementById('btn-admin-login');
+
+  errDiv.classList.remove('show');
+
+  if (!url) {
+    errDiv.textContent = '⚠️ กรุณากรอก Apps Script URL ก่อน';
+    errDiv.classList.add('show'); return;
   }
-  AUTH.currentRole = 'admin'; AUTH.currentUser = name;
-  animateLoginOut(() => {
-    document.getElementById('user-mode').style.display = 'none';
-    const adm = document.getElementById('admin-mode');
-    adm.style.display = 'flex'; adm.style.flexDirection = 'column';
-  });
-  document.getElementById('admin-name-badge').textContent = '👑 ' + name;
-  showToast('🎉 ยินดีต้อนรับ ' + name + ' (ผู้ดูแลระบบ)', 'success');
-  setTimeout(() => showView('setup'), 400);
+  if (!pw) {
+    errDiv.textContent = '⚠️ กรุณากรอกรหัสผ่าน';
+    errDiv.classList.add('show'); return;
+  }
+
+  // บันทึก Script URL
+  AUTH.saveScriptUrl(url);
+  state.config.scriptUrl = url;
+  localStorage.setItem('vos_config', JSON.stringify(state.config));
+
+  // แสดง loading
+  btn.textContent = '⏳ กำลังตรวจสอบ...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verifyAdmin', password: pw })
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      AUTH.currentRole = 'admin'; AUTH.currentUser = name;
+      animateLoginOut(() => {
+        document.getElementById('user-mode').style.display = 'none';
+        const adm = document.getElementById('admin-mode');
+        adm.style.display = 'flex'; adm.style.flexDirection = 'column';
+      });
+      document.getElementById('admin-name-badge').textContent = '👑 ' + name;
+      showToast('🎉 ยินดีต้อนรับ ' + name, 'success');
+      setTimeout(() => showView('setup'), 400);
+    } else {
+      errDiv.textContent = '❌ ' + (data.msg || 'รหัสผ่านไม่ถูกต้อง');
+      errDiv.classList.add('show');
+      document.getElementById('admin-password').style.borderColor = 'rgba(231,111,81,0.6)';
+      setTimeout(() => { document.getElementById('admin-password').style.borderColor = ''; }, 1500);
+    }
+  } catch(e) {
+    errDiv.textContent = '🌐 เชื่อมต่อ Apps Script ไม่ได้ — กรุณาตรวจสอบ URL';
+    errDiv.classList.add('show');
+  } finally {
+    btn.textContent = '🔐 เข้าสู่ระบบ';
+    btn.disabled = false;
+  }
 }
+
 function animateLoginOut(cb) {
   const ls = document.getElementById('login-screen');
   ls.style.transition = 'all 0.4s ease';
@@ -979,7 +1081,6 @@ function logout() {
   ls.style.display = 'flex'; ls.style.opacity = '0'; ls.style.transform = 'scale(0.95)';
   ls.style.transition = 'all 0.35s ease';
   setTimeout(() => { ls.style.opacity = '1'; ls.style.transform = 'scale(1)'; }, 30);
-  // Reset UI
   document.querySelectorAll('.login-step').forEach(s => s.classList.remove('active'));
   document.getElementById('step-role').classList.add('active');
   document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
@@ -1540,43 +1641,47 @@ function saveConfig() {
   state.config.hospital = document.getElementById('cfg-hospital').value;
   state.config.period = document.getElementById('cfg-period').value;
   state.config.collector = document.getElementById('cfg-collector').value;
-  state.config.scriptUrl = document.getElementById('cfg-script-url').value;
+  const url = document.getElementById('cfg-script-url').value.trim();
+  state.config.scriptUrl = url;
+  if (url) {
+    AUTH.saveScriptUrl(url);
+    document.getElementById('admin-script-url').value = url;
+  }
   localStorage.setItem('vos_config', JSON.stringify(state.config));
   showToast('✅ บันทึกการตั้งค่าแล้ว', 'success');
 }
 
-function changePassword() {
+async function changePassword() {
   const current = document.getElementById('cfg-current-password').value;
   const newPw   = document.getElementById('cfg-new-password').value.trim();
   const confirm = document.getElementById('cfg-confirm-password').value.trim();
+  const url     = AUTH.getScriptUrl() || state.config.scriptUrl;
 
-  // Validate current password
-  if (current !== AUTH.getAdminPassword()) {
-    showToast('❌ รหัสผ่านปัจจุบันไม่ถูกต้อง', 'error');
-    document.getElementById('cfg-current-password').focus();
-    return;
+  if (!url) { showToast('❌ กรุณาบันทึก Apps Script URL ก่อน', 'error'); return; }
+  if (!current) { showToast('❌ กรุณากรอกรหัสผ่านปัจจุบัน', 'error'); return; }
+  if (!newPw) { showToast('❌ กรุณากรอกรหัสผ่านใหม่', 'error'); return; }
+  if (newPw.length < 6) { showToast('❌ รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'error'); return; }
+  if (newPw !== confirm) { showToast('❌ รหัสผ่านใหม่ไม่ตรงกัน', 'error'); return; }
+
+  showToast('⏳ กำลังเปลี่ยนรหัสผ่านบนเซิร์ฟเวอร์...', 'success');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'changePassword', current, newPw })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('cfg-current-password').value = '';
+      document.getElementById('cfg-new-password').value = '';
+      document.getElementById('cfg-confirm-password').value = '';
+      showToast('🔐 เปลี่ยนรหัสผ่านสำเร็จ! บันทึกบนเซิร์ฟเวอร์แล้ว', 'success');
+    } else {
+      showToast('❌ ' + (data.msg || 'เกิดข้อผิดพลาด'), 'error');
+    }
+  } catch(e) {
+    showToast('🌐 เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error');
   }
-  // Validate new password
-  if (!newPw) {
-    showToast('❌ กรุณากรอกรหัสผ่านใหม่', 'error');
-    document.getElementById('cfg-new-password').focus();
-    return;
-  }
-  if (newPw.length < 6) {
-    showToast('❌ รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'error');
-    return;
-  }
-  if (newPw !== confirm) {
-    showToast('❌ รหัสผ่านใหม่ไม่ตรงกัน กรุณาลองใหม่', 'error');
-    document.getElementById('cfg-confirm-password').focus();
-    return;
-  }
-  // Save
-  AUTH.setAdminPassword(newPw);
-  document.getElementById('cfg-current-password').value = '';
-  document.getElementById('cfg-new-password').value = '';
-  document.getElementById('cfg-confirm-password').value = '';
-  showToast('🔐 เปลี่ยนรหัสผ่านสำเร็จแล้ว!', 'success');
 }
 
 // ═══════════════════════════════════════════
