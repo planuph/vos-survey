@@ -973,7 +973,7 @@ const AUTH = {
     return localStorage.getItem('vos_script_url') || '';
   },
   saveScriptUrl(url) {
-    localStorage.setItem('vos_script_url', url);
+    // URL จะถูกบันทึกใน saveConfig() เท่านั้น
   }
 };
 
@@ -1149,7 +1149,6 @@ function submitUserForm() {
     openEnded: state.formData.openEnded||{}, avgScore: parseFloat(avg.toFixed(2))
   };
   state.allResponses.push(resp);
-  localStorage.setItem('vos_responses', JSON.stringify(state.allResponses));
   if (state.config.scriptUrl) syncToSheets(resp);
   // Show success
   document.getElementById('user-form-area').style.display = 'none';
@@ -1642,14 +1641,20 @@ let state = {
   charts: {}
 };
 
-// Load from localStorage
+// Load from localStorage — เก็บเฉพาะ scriptUrl (ไม่เก็บข้อมูล responses หรือ config ที่ sensitive)
 function loadState() {
-  try {
-    const saved = localStorage.getItem('vos_config');
-    if (saved) Object.assign(state.config, JSON.parse(saved));
-    const responses = localStorage.getItem('vos_responses');
-    if (responses) state.allResponses = JSON.parse(responses);
+  // ล้างข้อมูลเก่าที่เคยเก็บไว้ใน localStorage ทั้งหมด
+  ['vos_admin_pw','vos_admin_password','adminPw','admin_pw',
+   'vos_responses','vos_config'].forEach(k => localStorage.removeItem(k));
 
+  // โหลดเฉพาะ scriptUrl (ไม่ sensitive — เป็นแค่ endpoint URL)
+  const savedUrl = localStorage.getItem('vos_script_url') || '';
+  if (savedUrl) {
+    state.config.scriptUrl = savedUrl;
+  }
+
+  // ตั้งค่า UI form
+  try {
     document.getElementById('cfg-hospital').value = state.config.hospital || '';
     document.getElementById('cfg-period').value = state.config.period || '';
     document.getElementById('cfg-collector').value = state.config.collector || '';
@@ -1674,10 +1679,9 @@ function saveConfig() {
   const sheetsLink = document.getElementById('cfg-sheets-link')?.value.trim() || '';
   state.config.sheetsLink = sheetsLink;
   if (url) {
-    AUTH.saveScriptUrl(url);
+    localStorage.setItem('vos_script_url', url);
     document.getElementById('admin-script-url').value = url;
   }
-  localStorage.setItem('vos_config', JSON.stringify(state.config));
   showToast('✅ บันทึกการตั้งค่าแล้ว', 'success');
 }
 
@@ -1783,7 +1787,6 @@ function submitAdminForm() {
     openEnded: state.formData.openEnded||{}, avgScore: parseFloat(avg.toFixed(2))
   };
   state.allResponses.push(response);
-  localStorage.setItem('vos_responses', JSON.stringify(state.allResponses));
   if (state.config.scriptUrl) syncToSheets(response);
   showToast('✅ ส่งแบบสอบถามสำเร็จ! คะแนนเฉลี่ย: '+(avg>0?avg.toFixed(2):'—')+' / 5', 'success');
   state.formData = {};
@@ -1810,16 +1813,19 @@ function updateOpenEnded(key, value) {
 async function syncToSheets(data) {
   if (!state.config.scriptUrl) return;
   try {
+    const payload = { action: 'submitForm', ...data };
     const resp = await fetch(state.config.scriptUrl, {
       method: 'POST',
-      body: JSON.stringify(data)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
     const result = await resp.json();
-    if (result.success) {
-      showToast('☁️ ซิงค์ข้อมูลไปยัง Google Sheets สำเร็จ', 'success');
+    if (result.ok) {
+      showToast('☁️ บันทึกข้อมูลไปยัง Google Sheets สำเร็จ', 'success');
     }
   } catch(e) {
-    // Silently fail - data already saved locally
+    showToast('⚠️ ไม่สามารถบันทึกลง Google Sheets ได้', 'error');
+    // data remains in session memory onlylocally
   }
 }
 
@@ -1845,7 +1851,6 @@ async function loadFromSheets() {
         avgScore: parseFloat(row.AvgScore || row.avgScore) || 0
       })).filter(r => r.groupId);
       state.allResponses = parsed;
-      localStorage.setItem('vos_responses', JSON.stringify(state.allResponses));
       document.getElementById('dash-sync-dot').className = 'sync-dot connected';
       document.getElementById('dash-sync-label').textContent = 'ซิงค์จาก Google Sheets';
     } else {
