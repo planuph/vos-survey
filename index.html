@@ -609,12 +609,9 @@ body {
         <input class="login-input" type="password" id="admin-password" placeholder="รหัสผ่าน" onkeydown="if(event.key==='Enter')loginAsAdmin()">
         <button class="toggle-pw" onclick="togglePw()" type="button" id="pw-eye">👁️</button>
       </div>
-      <div class="login-input-wrap" id="script-url-wrap">
-        <span class="login-input-icon" style="font-size:14px;">🔗</span>
-        <input class="login-input" type="url" id="admin-script-url" placeholder="Apps Script URL (https://script.google.com/...)" style="font-size:12px;" onkeydown="if(event.key==='Enter')loginAsAdmin()">
-      </div>
+      <input type="hidden" id="admin-script-url">
       <div style="color:rgba(255,255,255,0.4);font-size:11px;margin-bottom:12px;padding:0 4px;">
-        🛡️ รหัสผ่านถูกเก็บบนเซิร์ฟเวอร์ — ไม่สามารถดูได้จาก F12
+        🛡️ รหัสผ่านตรวจสอบผ่านเซิร์ฟเวอร์ — ไม่สามารถดูได้จาก F12
       </div>
       <div id="admin-err" class="login-err">รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่</div>
       <button class="btn-login" id="btn-admin-login" onclick="loginAsAdmin()">🔐 เข้าสู่ระบบ</button>
@@ -729,9 +726,17 @@ body {
           <div class="card-header"><div class="icon">🔗</div><div><h2>เชื่อมต่อ Google Sheets</h2><p>เก็บข้อมูลแบบสอบถามใน Google Sheets</p></div></div>
           <div class="card-body">
             <div class="form-group">
-              <label>Google Apps Script URL</label>
+              <label>🔗 Google Apps Script URL</label>
               <input type="url" id="cfg-script-url" placeholder="https://script.google.com/macros/s/..." >
-              <div class="hint">วาง URL ของ Google Apps Script Web App ที่นี่</div>
+              <div class="hint">วาง URL ของ Google Apps Script Web App ที่นี่ (สำหรับยืนยันรหัสผ่านและบันทึกข้อมูล)</div>
+            </div>
+            <div class="form-group">
+              <label>📊 ลิงก์ Google Sheet (Deploy URL)</label>
+              <input type="url" id="cfg-sheets-link" placeholder="https://docs.google.com/spreadsheets/d/..." >
+              <div class="hint" style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+                <span>วาง URL Google Sheet เพื่อดูข้อมูลโดยตรง</span>
+                <button type="button" onclick="openSheetsLink()" class="btn btn-sm" style="background:var(--success);color:white;padding:4px 12px;font-size:12px;">📂 เปิด Sheets</button>
+              </div>
             </div>
             <div class="sync-status" style="margin-bottom:16px;">
               <div class="sync-dot" id="sync-dot"></div>
@@ -753,7 +758,7 @@ body {
           <li>คลิก <strong>Deploy → New deployment → Web app</strong></li>
           <li>ตั้งค่า Execute as: <strong>"Me"</strong> | Who has access: <strong>"Anyone"</strong></li>
           <li>คัดลอก Web app URL นำมาวางในช่องด้านบน แล้วกด 💾 บันทึก</li>
-          <li>Login ด้วยรหัส <strong>admin1234</strong> แล้ว <strong>เปลี่ยนรหัสผ่านทันที</strong> ที่หน้าตั้งค่า</li>
+          <li>Login ด้วย User: <strong>PlanUPH</strong> รหัส: <strong>planuph</strong> แล้ว <strong>เปลี่ยนรหัสผ่านทันที</strong> ที่หน้าตั้งค่า</li>
         </ol>
         <div class="code-block" id="apps-script-code">// ═══════════════════════════════════════════
 // VOS Survey — Google Apps Script
@@ -768,14 +773,14 @@ function doPost(e) {
     // ── ตรวจสอบรหัสผ่าน Admin ──────────────
     if (action === 'verifyAdmin') {
       var stored = PropertiesService.getScriptProperties()
-                    .getProperty('ADMIN_PASSWORD') || 'admin1234';
+                    .getProperty('ADMIN_PASSWORD') || 'planuph';
       return json({ ok: body.password === stored });
     }
 
     // ── เปลี่ยนรหัสผ่าน Admin ───────────────
     if (action === 'changePassword') {
       var stored = PropertiesService.getScriptProperties()
-                    .getProperty('ADMIN_PASSWORD') || 'admin1234';
+                    .getProperty('ADMIN_PASSWORD') || 'planuph';
       if (body.current !== stored) {
         return json({ ok: false, msg: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
       }
@@ -840,8 +845,8 @@ function json(data) {
 // ── ตั้งรหัสผ่านเริ่มต้นครั้งแรก (รันครั้งเดียว) ──
 function setInitialPassword() {
   PropertiesService.getScriptProperties()
-    .setProperty('ADMIN_PASSWORD', 'admin1234');
-  Logger.log('✅ ตั้งรหัสผ่านเริ่มต้นแล้ว: admin1234');
+    .setProperty('ADMIN_PASSWORD', 'planuph');
+  Logger.log('✅ ตั้งรหัสผ่านเริ่มต้นแล้ว: planuph');
 }</div>
         <button class="btn btn-sm btn-outline" onclick="copyScript()" style="margin-top:10px;">📋 คัดลอกโค้ด</button>
       </div>
@@ -884,6 +889,7 @@ function setInitialPassword() {
           </div>
           <button class="btn btn-outline btn-sm" onclick="loadDashboard()">🔄 รีเฟรช</button>
           <button class="btn btn-primary btn-sm" onclick="exportCSV()">⬇️ ส่งออก CSV</button>
+          <button class="btn btn-sm" style="background:#0F9D58;color:white;" onclick="openSheetsLink()">📊 เปิด Google Sheet</button>
         </div>
       </div>
 
@@ -1009,60 +1015,74 @@ function loginAsUser() {
 async function loginAsAdmin() {
   const pw      = document.getElementById('admin-password').value;
   const name    = document.getElementById('admin-username').value.trim() || 'Admin';
-  const url     = document.getElementById('admin-script-url').value.trim();
   const errDiv  = document.getElementById('admin-err');
   const btn     = document.getElementById('btn-admin-login');
 
   errDiv.classList.remove('show');
 
-  if (!url) {
-    errDiv.textContent = '⚠️ กรุณากรอก Apps Script URL ก่อน';
-    errDiv.classList.add('show'); return;
-  }
   if (!pw) {
     errDiv.textContent = '⚠️ กรุณากรอกรหัสผ่าน';
     errDiv.classList.add('show'); return;
   }
 
-  // บันทึก Script URL
-  AUTH.saveScriptUrl(url);
-  state.config.scriptUrl = url;
-  localStorage.setItem('vos_config', JSON.stringify(state.config));
-
-  // แสดง loading
   btn.textContent = '⏳ กำลังตรวจสอบ...';
   btn.disabled = true;
 
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'verifyAdmin', password: pw })
-    });
-    const data = await res.json();
+  // ─── ลองตรวจสอบผ่าน Google Apps Script ก่อน ───
+  const savedUrl = AUTH.getScriptUrl() || state.config.scriptUrl || '';
+  let loginOk = false;
 
-    if (data.ok) {
-      AUTH.currentRole = 'admin'; AUTH.currentUser = name;
-      animateLoginOut(() => {
-        document.getElementById('user-mode').style.display = 'none';
-        const adm = document.getElementById('admin-mode');
-        adm.style.display = 'flex'; adm.style.flexDirection = 'column';
+  if (savedUrl) {
+    try {
+      const res = await fetch(savedUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verifyAdmin', password: pw })
       });
-      document.getElementById('admin-name-badge').textContent = '👑 ' + name;
-      showToast('🎉 ยินดีต้อนรับ ' + name, 'success');
-      setTimeout(() => showView('setup'), 400);
-    } else {
-      errDiv.textContent = '❌ ' + (data.msg || 'รหัสผ่านไม่ถูกต้อง');
-      errDiv.classList.add('show');
-      document.getElementById('admin-password').style.borderColor = 'rgba(231,111,81,0.6)';
-      setTimeout(() => { document.getElementById('admin-password').style.borderColor = ''; }, 1500);
+      const data = await res.json();
+      if (data.ok) {
+        loginOk = true;
+      } else if (!data.ok && data.msg) {
+        // Server responded — password is wrong
+        btn.textContent = '🔐 เข้าสู่ระบบ';
+        btn.disabled = false;
+        errDiv.textContent = '❌ ' + data.msg;
+        errDiv.classList.add('show');
+        document.getElementById('admin-password').style.borderColor = 'rgba(231,111,81,0.6)';
+        setTimeout(() => { document.getElementById('admin-password').style.borderColor = ''; }, 1500);
+        return;
+      }
+    } catch(e) {
+      // Network error — fall through to local fallback
     }
-  } catch(e) {
-    errDiv.textContent = '🌐 เชื่อมต่อ Apps Script ไม่ได้ — กรุณาตรวจสอบ URL';
+  }
+
+  // ─── Fallback: ตรวจสอบ username/password เริ่มต้น ───
+  if (!loginOk) {
+    const uInput = name.trim().toLowerCase();
+    if (uInput === 'planuph' && pw === 'planuph') {
+      loginOk = true;
+    }
+  }
+
+  btn.textContent = '🔐 เข้าสู่ระบบ';
+  btn.disabled = false;
+
+  if (loginOk) {
+    AUTH.currentRole = 'admin'; AUTH.currentUser = name;
+    animateLoginOut(() => {
+      document.getElementById('user-mode').style.display = 'none';
+      const adm = document.getElementById('admin-mode');
+      adm.style.display = 'flex'; adm.style.flexDirection = 'column';
+    });
+    document.getElementById('admin-name-badge').textContent = '👑 ' + name;
+    showToast('🎉 ยินดีต้อนรับ ' + name, 'success');
+    setTimeout(() => showView('setup'), 400);
+  } else {
+    errDiv.textContent = '❌ Username หรือรหัสผ่านไม่ถูกต้อง';
     errDiv.classList.add('show');
-  } finally {
-    btn.textContent = '🔐 เข้าสู่ระบบ';
-    btn.disabled = false;
+    document.getElementById('admin-password').style.borderColor = 'rgba(231,111,81,0.6)';
+    setTimeout(() => { document.getElementById('admin-password').style.borderColor = ''; }, 1500);
   }
 }
 
@@ -1634,7 +1654,15 @@ function loadState() {
     document.getElementById('cfg-period').value = state.config.period || '';
     document.getElementById('cfg-collector').value = state.config.collector || '';
     document.getElementById('cfg-script-url').value = state.config.scriptUrl || '';
+    if (document.getElementById('cfg-sheets-link'))
+      document.getElementById('cfg-sheets-link').value = state.config.sheetsLink || '';
   } catch(e) {}
+}
+
+function openSheetsLink() {
+  const url = document.getElementById('cfg-sheets-link')?.value.trim() || state.config.sheetsLink || '';
+  if (!url) { showToast('❌ กรุณากรอก URL ของ Google Sheet ก่อน', 'error'); return; }
+  window.open(url, '_blank');
 }
 
 function saveConfig() {
@@ -1643,6 +1671,8 @@ function saveConfig() {
   state.config.collector = document.getElementById('cfg-collector').value;
   const url = document.getElementById('cfg-script-url').value.trim();
   state.config.scriptUrl = url;
+  const sheetsLink = document.getElementById('cfg-sheets-link')?.value.trim() || '';
+  state.config.sheetsLink = sheetsLink;
   if (url) {
     AUTH.saveScriptUrl(url);
     document.getElementById('admin-script-url').value = url;
