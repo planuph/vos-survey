@@ -555,7 +555,6 @@ body {
   <div class="login-box">
     <div class="login-logo">
       <div class="logo-icon">🏥</div>
-      <h1>งานแผนและพัสดุ 7043</h1>
       <h1>VOS Survey</h1>
       <p>แบบสำรวจเสียงผู้มีส่วนได้ส่วนเสีย<br>โรงพยาบาลมหาวิทยาลัยพะเยา</p>
     </div>
@@ -599,7 +598,7 @@ body {
       <button class="back-link" onclick="backToRole()">← กลับ</button>
       <div style="color:rgba(255,255,255,0.85);font-size:14px;margin-bottom:20px;">
         <strong style="color:white;">🔐 เข้าสู่ระบบผู้ดูแล</strong><br>
-           ติดต่อที่งานแผนและพัสดุ โทร 7043
+        รหัสผ่านถูกตรวจสอบจากเซิร์ฟเวอร์ Google Apps Script
       </div>
       <div class="login-input-wrap">
         <span class="login-input-icon">👤</span>
@@ -612,15 +611,14 @@ body {
       </div>
       <input type="hidden" id="admin-script-url">
       <div style="color:rgba(255,255,255,0.4);font-size:11px;margin-bottom:12px;padding:0 4px;">
-        
+        🛡️ รหัสผ่านตรวจสอบผ่านเซิร์ฟเวอร์ — ไม่สามารถดูได้จาก F12
       </div>
       <div id="admin-err" class="login-err">รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่</div>
       <button class="btn-login" id="btn-admin-login" onclick="loginAsAdmin()">🔐 เข้าสู่ระบบ</button>
     </div>
 
     <div class="login-footer">
-      VOS Survey v1.0 | HA / EdPEx / TQA / WFME | <br>
-    งานแผน รพ.มพ. ครั้งที่ 1 พ.ศ. 2569
+      VOS Survey v2.0 | HA / EdPEx / TQA / WFME | พศช. ครั้งที่ 10 พ.ศ. 2569
     </div>
   </div>
 </div>
@@ -1155,7 +1153,7 @@ function submitUserForm() {
   state.allResponses.push(resp);
   // ดึง scriptUrl ใหม่กันกรณีที่ยังไม่ได้ถูก set ใน state
   if (!state.config.scriptUrl) {
-    state.config.scriptUrl = localStorage.getItem('vos_script_url') || '';
+    state.config.scriptUrl = localStorage.getItem('vos_script_url') || DEFAULT_SCRIPT_URL;
   }
   if (state.config.scriptUrl) {
     syncToSheets(resp);
@@ -1639,6 +1637,11 @@ const GROUPS = [
 // ═══════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+// ⚙️ ADMIN: วาง Apps Script URL ที่นี่ เพื่อให้ทุกคนใช้งานได้
+// ════════════════════════════════════════════
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdwdMN6lLFaEydzEXxXcodMMC1QofbSpTOv3CPRRS43Fro1iZalPuMLGm_vJ1IeG_N1A/exec';  // ← Admin วาง URL ตรงนี้เลย
+
 let state = {
   currentView: 'setup',
   selectedGroup: null,
@@ -1648,7 +1651,7 @@ let state = {
     hospital: 'โรงพยาบาลมหาวิทยาลัยพะเยา',
     period: '',
     collector: '',
-    scriptUrl: ''
+    scriptUrl: DEFAULT_SCRIPT_URL
   },
   charts: {}
 };
@@ -1659,8 +1662,8 @@ function loadState() {
   ['vos_admin_pw','vos_admin_password','adminPw','admin_pw',
    'vos_responses','vos_config'].forEach(k => localStorage.removeItem(k));
 
-  // โหลด scriptUrl (ไม่ sensitive) — ใช้ได้ทั้ง Admin และ User mode
-  const savedUrl = localStorage.getItem('vos_script_url') || '';
+  // โหลด scriptUrl — localStorage ก่อน ถ้าไม่มีใช้ค่าที่ฝังในโค้ด (DEFAULT_SCRIPT_URL)
+  const savedUrl = localStorage.getItem('vos_script_url') || DEFAULT_SCRIPT_URL;
   if (savedUrl) {
     state.config.scriptUrl = savedUrl;
     AUTH.scriptUrl = savedUrl;
@@ -1705,6 +1708,7 @@ function saveConfig() {
   state.config.sheetsLink = sheetsLink;
   if (url) {
     localStorage.setItem('vos_script_url', url);
+    state.config.scriptUrl = url;  // อัปเดต state ทันทีด้วย
     document.getElementById('admin-script-url').value = url;
   }
   // บันทึก config พื้นฐานลง sessionStorage (หายเองเมื่อปิด browser — ไม่ค้างใน F12)
@@ -1821,7 +1825,7 @@ function submitAdminForm() {
   };
   state.allResponses.push(response);
   if (!state.config.scriptUrl) {
-    state.config.scriptUrl = localStorage.getItem('vos_script_url') || '';
+    state.config.scriptUrl = localStorage.getItem('vos_script_url') || DEFAULT_SCRIPT_URL;
   }
   if (state.config.scriptUrl) syncToSheets(response);
   showToast('✅ ส่งแบบสอบถามสำเร็จ! คะแนนเฉลี่ย: '+(avg>0?avg.toFixed(2):'—')+' / 5', 'success');
