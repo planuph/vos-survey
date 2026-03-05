@@ -471,6 +471,19 @@ body {
 .score-card .sc-bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; margin-top: 8px; }
 .score-card .sc-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--primary), var(--primary-light)); transition: width 0.8s ease; }
 .score-card .sc-count { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.sc-pct-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.sc-pct-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-weight: 700; padding: 2px 8px;
+  border-radius: 10px; white-space: nowrap;
+}
+.sc-pct-badge.score  { background: rgba(0,109,119,0.1);  color: #006D77; }
+.sc-pct-badge.sat    { background: rgba(42,157,143,0.12); color: #1A7A6E; }
+.sc-pct-badge.resp   { background: rgba(226,149,120,0.15);color: #C06040; }
+.stat-pct-row { display: flex; gap: 16px; margin-top: 8px; flex-wrap: wrap; }
+.stat-pct-item { display: flex; flex-direction: column; }
+.stat-pct-item .sp-label { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+.stat-pct-item .sp-val   { font-size: 18px; font-weight: 700; }
 
 .responses-table-wrap { overflow-x: auto; }
 .responses-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -555,7 +568,8 @@ body {
   <div class="login-box">
     <div class="login-logo">
       <div class="logo-icon">🏥</div>
-      <h1>งานแผนและพัสดุ 7043</h1>
+      <p style="color:white;font-size:15px;font-weight:700;margin-bottom:2px;margin-top:0;"></p>
+	<h1>งานแผนและพัสดุ 7043</h1>
       <h1>VOS Survey</h1>
       <p>แบบสำรวจเสียงผู้มีส่วนได้ส่วนเสีย<br>โรงพยาบาลมหาวิทยาลัยพะเยา</p>
     </div>
@@ -603,7 +617,7 @@ body {
       </div>
       <div class="login-input-wrap">
         <span class="login-input-icon">👤</span>
-        <input class="login-input" type="text" id="admin-username" placeholder="ชื่อผู้ดูแล" value="Admin">
+        <input class="login-input" type="text" id="admin-username" placeholder="ชื่อผู้ดูแล" value="">
       </div>
       <div class="login-input-wrap">
         <span class="login-input-icon">🔒</span>
@@ -612,7 +626,7 @@ body {
       </div>
       <input type="hidden" id="admin-script-url">
       <div style="color:rgba(255,255,255,0.4);font-size:11px;margin-bottom:12px;padding:0 4px;">
-        
+      
       </div>
       <div id="admin-err" class="login-err">รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่</div>
       <button class="btn-login" id="btn-admin-login" onclick="loginAsAdmin()">🔐 เข้าสู่ระบบ</button>
@@ -620,7 +634,7 @@ body {
 
     <div class="login-footer">
       VOS Survey v1.0 | HA / EdPEx / TQA / WFME | <br>
-      งานแผน รพ.มพ. ครั้งที่ 1 พ.ศ. 2569
+	งานแผน รพ.มพ ครั้งที่ 1 พ.ศ. 2569
     </div>
   </div>
 </div>
@@ -690,7 +704,8 @@ body {
       <div class="setup-hero">
         <h1>แบบสำรวจเสียงผู้มีส่วนได้ส่วนเสีย (VOS)</h1>
         <p>Voice of Stakeholder — ครอบคลุมผู้มีส่วนได้ส่วนเสีย 14 กลุ่ม | ภายใน 6 กลุ่ม | ภายนอก 8 กลุ่ม</p>
-        <p>อ้างอิงมาตรฐาน HA / EdPEx / TQA / WFME | พศช. ครั้งที่ 10 พ.ศ. 2569</p>
+        <p>อ้างอิงมาตรฐาน HA / EdPEx / TQA / WFME | <br>
+	งานแผน รพ.มพ ครั้งที่ 1 พ.ศ. 2569</p>
         <div class="badge">🏥 โรงพยาบาลมหาวิทยาลัยพะเยา / คณะแพทยศาสตร์</div>
       </div>
 
@@ -1956,11 +1971,53 @@ function renderStats() {
   const overall = scores.length > 0 ? (scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
   const period = state.config.period || '-';
 
+  // % คะแนน (score/5 * 100)
+  const scorePct = overall > 0 ? (overall / 5 * 100).toFixed(1) : '-';
+
+  // % ความพึงพอใจ (คนที่ให้ >= 4 จากทั้งหมด)
+  const satisfiedCount = scores.filter(s => s >= 4).length;
+  const satPct = scores.length > 0 ? ((satisfiedCount / scores.length) * 100).toFixed(1) : '-';
+
+  // % การตอบรับ (กลุ่มที่มีข้อมูล / 14 กลุ่ม)
+  const respPct = ((groups / 14) * 100).toFixed(1);
+
   document.getElementById('stats-row').innerHTML = `
-    <div class="stat-card"><div class="s-label">แบบสอบถามทั้งหมด</div><div class="s-value">${total}</div><div class="s-sub">รายการที่ได้รับ</div></div>
-    <div class="stat-card"><div class="s-label">กลุ่มที่มีข้อมูล</div><div class="s-value">${groups}</div><div class="s-sub">จาก 14 กลุ่ม</div></div>
-    <div class="stat-card"><div class="s-label">คะแนนเฉลี่ยรวม</div><div class="s-value" style="color:${scoreColor(overall)}">${overall > 0 ? overall.toFixed(2) : '-'}</div><div class="s-sub">จาก 5 คะแนน</div></div>
-    <div class="stat-card"><div class="s-label">รอบการประเมิน</div><div class="s-value" style="font-size:22px">${period || 'ยังไม่กำหนด'}</div><div class="s-sub">ปีงบประมาณ</div></div>
+    <div class="stat-card">
+      <div class="s-label">แบบสอบถามทั้งหมด</div>
+      <div class="s-value">${total}</div>
+      <div class="s-sub">รายการที่ได้รับ</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">กลุ่มที่มีข้อมูล</div>
+      <div class="s-value">${groups}</div>
+      <div class="s-sub">จาก 14 กลุ่ม</div>
+      <div class="stat-pct-row">
+        <div class="stat-pct-item">
+          <span class="sp-label">% ตอบรับ</span>
+          <span class="sp-val" style="color:#C06040">${respPct}%</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">คะแนนเฉลี่ยรวม</div>
+      <div class="s-value" style="color:${scoreColor(overall)}">${overall > 0 ? overall.toFixed(2) : '-'}</div>
+      <div class="s-sub">จาก 5 คะแนน</div>
+      <div class="stat-pct-row">
+        <div class="stat-pct-item">
+          <span class="sp-label">% คะแนน</span>
+          <span class="sp-val" style="color:${scoreColor(overall)}">${scorePct !== '-' ? scorePct+'%' : '-'}</span>
+        </div>
+        <div class="stat-pct-item">
+          <span class="sp-label">% พึงพอใจ</span>
+          <span class="sp-val" style="color:#1A7A6E">${satPct !== '-' ? satPct+'%' : '-'}</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">รอบการประเมิน</div>
+      <div class="s-value" style="font-size:22px">${period || 'ยังไม่กำหนด'}</div>
+      <div class="s-sub">ปีงบประมาณ</div>
+    </div>
   `;
 
   document.getElementById('dash-subtitle').textContent =
@@ -1979,13 +2036,29 @@ function renderGroupScoreCards() {
     const { avg, count } = getGroupScore(g.id);
     const color = scoreColor(avg);
     const pct = avg > 0 ? (avg/5*100) : 0;
+
+    // % คะแนน
+    const scorePct = avg > 0 ? (avg/5*100).toFixed(1)+'%' : '—';
+
+    // % ความพึงพอใจ (คะแนน >= 4)
+    const groupResponses = state.allResponses.filter(r => r.groupId === g.id);
+    const satisfiedCount = groupResponses.filter(r => (parseFloat(r.avgScore)||0) >= 4).length;
+    const satPct = count > 0 ? ((satisfiedCount/count)*100).toFixed(1)+'%' : '—';
+
+    // % การตอบรับ (กลุ่มนี้มีข้อมูลหรือเปล่า → แสดงว่า "มีข้อมูล" หรือแสดงสัดส่วนถ้าหลายคน)
+    const respPctLabel = count > 0 ? count + ' ราย' : '0 ราย';
+
     return `
       <div class="score-card" onclick="switchTab('bygroup'); document.getElementById('detail-group-select').value='${g.id}'; renderGroupDetail(${g.id})">
         <div class="sc-icon">${g.icon}</div>
         <div class="sc-name">${g.id}. ${g.name}</div>
         <div class="sc-score" style="color:${avg>0?color:'#ccc'}">${avg > 0 ? avg.toFixed(2) : '—'}</div>
         <div class="sc-bar"><div class="sc-bar-fill" style="width:${pct}%"></div></div>
-        <div class="sc-count">${count > 0 ? count + ' คำตอบ' : 'ยังไม่มีข้อมูล'}</div>
+        <div class="sc-pct-row">
+          <span class="sc-pct-badge score" title="% คะแนนจาก 5">📊 ${scorePct}</span>
+          <span class="sc-pct-badge sat"   title="% ผู้ที่พึงพอใจ (≥4)">😊 ${satPct}</span>
+          <span class="sc-pct-badge resp"  title="จำนวนผู้ตอบ">👤 ${respPctLabel}</span>
+        </div>
       </div>
     `;
   }).join('');
